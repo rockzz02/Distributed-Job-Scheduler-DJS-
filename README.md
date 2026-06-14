@@ -153,12 +153,11 @@ Use a future `nextRunAt`. Most examples below use year `2099` so they remain val
 
 ### Create a Runnable Demo Job
 
-This one-time job is scheduled a few minutes in the future so the scheduler and worker actually pick it up during a demo. The job itself is still a simulated `NOOP`; the visible result is that `GET /jobs/{id}` changes from `ACTIVE` to `COMPLETED`, and the app logs show the execution being claimed and completed or retried.
+This one-time job is scheduled two minutes in the future so the scheduler and worker actually pick it up during a demo. The job itself is still a simulated `NOOP`; the visible terminal output is the job status changing from `ACTIVE` to `COMPLETED`.
 
 ```bash
 NEXT_RUN_AT=$(python3 -c 'from datetime import datetime, timezone, timedelta; print((datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat().replace("+00:00", "Z"))')
-
-curl -i -X POST http://localhost:8080/jobs \
+RESPONSE=$(curl -s -X POST http://localhost:8080/jobs \
   -H 'Content-Type: application/json' \
   -H 'X-Request-Id: demo-runnable-1' \
   -d '{
@@ -176,13 +175,34 @@ curl -i -X POST http://localhost:8080/jobs \
     "retryStrategy": "FIXED",
     "retryDelaySeconds": 10,
     "timeoutSeconds": 120
-  }'
+  }')
+
+JOB_ID=$(printf '%s' "$RESPONSE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+echo "created job: $JOB_ID"
+echo "scheduled for: $NEXT_RUN_AT"
+
+for attempt in $(seq 1 60); do
+  JOB_JSON=$(curl -s "http://localhost:8080/jobs/$JOB_ID")
+  STATUS=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+  printf '%s status=%s\n' "$(date -u +%H:%M:%S)" "$STATUS"
+
+  if [ "$STATUS" = "COMPLETED" ]; then
+    break
+  fi
+
+  sleep 5
+done
 ```
 
-Copy the `id` from the response body, then check the job after the next scheduler tick after `nextRunAt`:
+Expected output ends like this:
 
-```bash
-curl http://localhost:8080/jobs/{jobId}
+```text
+created job: 42cf2fc3-3f51-43d4-b342-fb4ad5fd704a
+scheduled for: 2026-06-14T12:02:00Z
+12:00:04 status=ACTIVE
+12:00:09 status=ACTIVE
+...
+12:02:14 status=COMPLETED
 ```
 
 ### Create a Fixed-Rate Job
@@ -212,20 +232,25 @@ curl -X POST http://localhost:8080/jobs \
 ### Create a One-Time Job
 
 ```bash
-curl -X POST http://localhost:8080/jobs \
+NEXT_RUN_AT=$(python3 -c 'from datetime import datetime, timezone, timedelta; print((datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat().replace("+00:00", "Z"))')
+
+curl -i -X POST http://localhost:8080/jobs \
   -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: demo-runnable-1' \
   -d '{
-    "name": "demo-one-time-job",
-    "description": "Runs once",
+    "name": "demo-runnable-job",
+    "description": "Runs shortly after creation so the scheduler and worker activity is visible",
     "type": "NOOP",
-    "payload": {},
+    "payload": {
+      "source": "curl-demo"
+    },
     "scheduleType": "ONE_TIME",
     "cronExpression": null,
     "intervalSeconds": null,
-    "nextRunAt": "2099-01-01T00:00:00Z",
-    "maxRetries": 0,
-    "retryStrategy": "NONE",
-    "retryDelaySeconds": 0,
+    "nextRunAt": "'"$NEXT_RUN_AT"'",
+    "maxRetries": 3,
+    "retryStrategy": "FIXED",
+    "retryDelaySeconds": 10,
     "timeoutSeconds": 120
   }'
 ```
