@@ -149,7 +149,41 @@ http://localhost:8080
 
 ## Example Requests
 
-Use a future `nextRunAt`. The examples below use year `2099` so they remain valid.
+Use a future `nextRunAt`. Most examples below use year `2099` so they remain valid.
+
+### Create a Runnable Demo Job
+
+This one-time job is scheduled a few minutes in the future so the scheduler and worker actually pick it up during a demo. The job itself is still a simulated `NOOP`; the visible result is that `GET /jobs/{id}` changes from `ACTIVE` to `COMPLETED`, and the app logs show the execution being claimed and completed or retried.
+
+```bash
+NEXT_RUN_AT=$(python3 -c 'from datetime import datetime, timezone, timedelta; print((datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat().replace("+00:00", "Z"))')
+
+curl -i -X POST http://localhost:8080/jobs \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: demo-runnable-1' \
+  -d '{
+    "name": "demo-runnable-job",
+    "description": "Runs shortly after creation so the scheduler and worker activity is visible",
+    "type": "NOOP",
+    "payload": {
+      "source": "curl-demo"
+    },
+    "scheduleType": "ONE_TIME",
+    "cronExpression": null,
+    "intervalSeconds": null,
+    "nextRunAt": "'"$NEXT_RUN_AT"'",
+    "maxRetries": 3,
+    "retryStrategy": "FIXED",
+    "retryDelaySeconds": 10,
+    "timeoutSeconds": 120
+  }'
+```
+
+Copy the `id` from the response body, then check the job after the next scheduler tick after `nextRunAt`:
+
+```bash
+curl http://localhost:8080/jobs/{jobId}
+```
 
 ### Create a Fixed-Rate Job
 
