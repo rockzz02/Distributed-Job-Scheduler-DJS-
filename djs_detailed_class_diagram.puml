@@ -1,0 +1,143 @@
+@startuml
+' Distributed Job Scheduler (DJS) - Current Architecture
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+left to right direction
+
+title Distributed Job Scheduler (DJS)\nCurrent implemented components
+
+package "api" {
+  class JobController {
+    +createJob(request): ResponseEntity<JobResponse>
+    +listJobs(pageable): Page<JobResponse>
+    +getJob(id): JobResponse
+    +deleteJob(id): ResponseEntity<Void>
+  }
+
+  record CreateJobRequest
+  record JobResponse
+  class JobApiMapper
+}
+
+package "job" {
+  class Job {
+    +UUID id
+    +String name
+    +String type
+    +Map payload
+    +String scheduleType
+    +Instant nextRunAt
+    +JobStatus status
+    +int maxRetries
+    +String retryStrategy
+    +int retryDelaySeconds
+    +int timeoutSeconds
+  }
+
+  enum JobStatus {
+    ACTIVE
+    PAUSED
+    COMPLETED
+    DELETED
+  }
+
+  interface JobRepository
+  interface JobService
+  class DefaultJobService
+  class JobCommandValidator
+}
+
+package "execution" {
+  class JobExecution {
+    +UUID id
+    +Job job
+    +Instant scheduledAt
+    +Instant queuedAt
+    +Instant startedAt
+    +Instant completedAt
+    +JobExecutionStatus status
+    +int attemptCount
+    +int retryCount
+    +Instant nextRetryAt
+    +String lastError
+    +String lockedBy
+    +Instant lockedUntil
+  }
+
+  enum JobExecutionStatus {
+    PENDING
+    RUNNING
+    SUCCESS
+    FAILED
+    DEAD
+  }
+
+  interface JobExecutionRepository
+}
+
+package "scheduler" {
+  class JobSchedulerService {
+    +scheduleRunnableJobs(): void
+  }
+
+  record SchedulerProperties
+}
+
+package "queue" {
+  record JobExecutionMessage
+  interface JobExecutionPublisher
+  class RabbitMqJobExecutionPublisher
+  class JobExecutionConsumer
+  class RabbitMqConfig
+}
+
+package "worker" {
+  interface JobExecutionWorker
+  class DefaultJobExecutionWorker
+  class SimulatedJobRunner
+  record WorkerProperties
+}
+
+package "retry" {
+  interface RetryService
+  class DefaultRetryService
+  record RetryDecision
+  enum RetryDecisionType
+}
+
+JobController --> JobService
+JobController --> JobApiMapper
+JobApiMapper --> Job
+DefaultJobService ..|> JobService
+DefaultJobService --> JobRepository
+DefaultJobService --> JobCommandValidator
+
+Job "1" --> "*" JobExecution
+JobExecutionRepository --> JobExecution
+
+JobSchedulerService --> JobRepository
+JobSchedulerService --> JobExecutionRepository
+JobSchedulerService --> JobExecutionPublisher
+JobSchedulerService --> RetryService
+RabbitMqJobExecutionPublisher ..|> JobExecutionPublisher
+RabbitMqJobExecutionPublisher --> JobExecutionMessage
+
+JobExecutionConsumer --> JobExecutionMessage
+JobExecutionConsumer --> JobExecutionWorker
+DefaultJobExecutionWorker ..|> JobExecutionWorker
+DefaultJobExecutionWorker --> JobExecutionRepository
+DefaultJobExecutionWorker --> SimulatedJobRunner
+DefaultJobExecutionWorker --> RetryService
+
+DefaultRetryService ..|> RetryService
+DefaultRetryService --> JobExecutionRepository
+
+note bottom of JobExecutionStatus
+  PENDING -> RUNNING -> SUCCESS
+  PENDING -> RUNNING -> FAILED -> PENDING
+  PENDING -> RUNNING -> DEAD
+end note
+
+@enduml

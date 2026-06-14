@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" role="img" aria-labelledby="title desc">
+  <title id="title">Distributed Job Scheduler current architecture</title>
+  <desc id="desc">REST API stores jobs in PostgreSQL, scheduler publishes runnable executions to RabbitMQ, worker consumes messages, retries failures, and persists final state.</desc>
+  <style>
+    .box { fill: #f8fafc; stroke: #334155; stroke-width: 2; rx: 8; }
+    .core { fill: #eef2ff; }
+    .data { fill: #ecfdf5; }
+    .queue { fill: #fff7ed; }
+    .text { font-family: Arial, sans-serif; font-size: 16px; fill: #0f172a; }
+    .small { font-size: 13px; fill: #475569; }
+    .arrow { stroke: #334155; stroke-width: 2; marker-end: url(#arrow); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+    </marker>
+  </defs>
+
+  <rect class="box core" x="40" y="80" width="170" height="80" />
+  <text class="text" x="125" y="115" text-anchor="middle">REST API</text>
+  <text class="small" x="125" y="140" text-anchor="middle">/jobs endpoints</text>
+
+  <rect class="box data" x="280" y="80" width="190" height="80" />
+  <text class="text" x="375" y="115" text-anchor="middle">PostgreSQL</text>
+  <text class="small" x="375" y="140" text-anchor="middle">jobs, executions, retries</text>
+
+  <rect class="box core" x="540" y="80" width="190" height="80" />
+  <text class="text" x="635" y="115" text-anchor="middle">Scheduler</text>
+  <text class="small" x="635" y="140" text-anchor="middle">due jobs, retries, timeouts</text>
+
+  <rect class="box queue" x="800" y="80" width="190" height="80" />
+  <text class="text" x="895" y="115" text-anchor="middle">RabbitMQ</text>
+  <text class="small" x="895" y="140" text-anchor="middle">execution queue + DLQ</text>
+
+  <rect class="box core" x="540" y="260" width="190" height="80" />
+  <text class="text" x="635" y="295" text-anchor="middle">Worker</text>
+  <text class="small" x="635" y="320" text-anchor="middle">simulate execution</text>
+
+  <rect class="box core" x="280" y="260" width="190" height="80" />
+  <text class="text" x="375" y="295" text-anchor="middle">Retry Service</text>
+  <text class="small" x="375" y="320" text-anchor="middle">retry or dead decision</text>
+
+  <rect class="box data" x="280" y="430" width="450" height="110" />
+  <text class="text" x="505" y="465" text-anchor="middle">Execution State Machine</text>
+  <text class="small" x="505" y="495" text-anchor="middle">PENDING -> RUNNING -> SUCCESS</text>
+  <text class="small" x="505" y="520" text-anchor="middle">PENDING -> RUNNING -> FAILED -> PENDING</text>
+  <text class="small" x="505" y="535" text-anchor="middle">PENDING -> RUNNING -> DEAD</text>
+
+  <path class="arrow" d="M210 120 H280" />
+  <path class="arrow" d="M470 120 H540" />
+  <path class="arrow" d="M730 120 H800" />
+  <path class="arrow" d="M895 160 V300 H730" />
+  <path class="arrow" d="M540 300 H470" />
+  <path class="arrow" d="M375 260 V160 H375" />
+  <path class="arrow" d="M635 340 V430" />
+  <path class="arrow" d="M505 430 V340" />
+</svg>

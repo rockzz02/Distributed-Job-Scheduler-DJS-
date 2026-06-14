@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: djs
+      POSTGRES_USER: djs
+      POSTGRES_PASSWORD: djs
+    ports:
+      - "5433:5433"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U djs -d djs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: djs
+      RABBITMQ_DEFAULT_PASS: djs
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  djs-app:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      DJS_DATABASE_URL: jdbc:postgresql://postgres:5432/djs
+      DJS_DATABASE_USERNAME: djs
+      DJS_DATABASE_PASSWORD: djs
+      DJS_RABBITMQ_HOST: rabbitmq
+      DJS_RABBITMQ_PORT: 5672
+      DJS_RABBITMQ_USERNAME: djs
+      DJS_RABBITMQ_PASSWORD: djs
+      DJS_SCHEDULER_ENABLED: "true"
+      DJS_WORKER_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

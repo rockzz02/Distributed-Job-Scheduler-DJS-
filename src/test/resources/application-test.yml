@@ -1,0 +1,10 @@
+djs:
+  scheduler:
+    enabled: false
+  worker:
+    enabled: false
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
